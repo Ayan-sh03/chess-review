@@ -1,0 +1,5 @@
+# Cloudflare Pages headers — enable SharedArrayBuffer for the multi-threaded
+# Stockfish build. The app degrades to single-thread when these are absent.
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
