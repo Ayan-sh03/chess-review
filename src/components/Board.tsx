@@ -29,24 +29,25 @@ export default function Board() {
   const playedClass: Classification | undefined =
     !variation && currentPly > 0 ? review?.moves[currentPly - 1]?.classification : undefined;
 
-  // Best move comes from the live engine, else from the review of this position.
+  // Best move comes from the live engine (only if it analyzed this exact
+  // position — stale results must never draw on the board), else from the
+  // review of this position.
+  const live = liveAnalysis && liveAnalysis.fen === fen ? liveAnalysis : null;
   const bestUci =
-    liveAnalysis?.bestUci ??
+    live?.bestUci ??
     (!variation && game ? review?.moves[currentPly]?.bestUci : undefined);
-  const multipv = liveAnalysis?.lines ?? [];
 
   const arrows = useMemo(() => {
     if (!settings.showArrows) return [] as any[];
     const out: [string, string, string?][] = [];
-    if (bestUci) out.push([bestUci.slice(0, 2), bestUci.slice(2, 4), '#22a7f0']);
-    if (settings.showMultiPvArrows) {
-      multipv.slice(1, 3).forEach((l) => {
-        const u = l.uci[0];
-        if (u) out.push([u.slice(0, 2), u.slice(2, 4), '#3b7dd855']);
-      });
+    if (playedMove) {
+      out.push([playedMove.uci.slice(0, 2), playedMove.uci.slice(2, 4), '#f5a623']);
+    }
+    if (bestUci && bestUci.slice(0, 4) !== playedMove?.uci.slice(0, 4)) {
+      out.push([bestUci.slice(0, 2), bestUci.slice(2, 4), '#22a7f0']);
     }
     return out;
-  }, [bestUci, multipv, settings.showArrows, settings.showMultiPvArrows]);
+  }, [bestUci, playedMove, settings.showArrows]);
 
   const squareStyles = useMemo(() => {
     const st: Record<string, React.CSSProperties> = {};

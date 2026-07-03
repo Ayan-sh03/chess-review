@@ -88,8 +88,6 @@ export default function SettingsPanel() {
           </label>
           <Toggle label="Best-move arrows" checked={settings.showArrows}
             onChange={(v) => updateSettings({ showArrows: v })} />
-          <Toggle label="Secondary MultiPV arrows" checked={settings.showMultiPvArrows}
-            onChange={(v) => updateSettings({ showMultiPvArrows: v })} />
           <Toggle label="Auto-flip to side under review" checked={settings.autoFlip}
             onChange={(v) => updateSettings({ autoFlip: v })} />
         </div>

@@ -145,7 +145,6 @@ export interface Settings {
   boardDark: string;
   autoFlip: boolean;
   showArrows: boolean;
-  showMultiPvArrows: boolean;
   autoplayMs: number;
 }
 
@@ -167,7 +166,6 @@ export const DEFAULT_SETTINGS: Settings = {
   boardDark: '#739552',
   autoFlip: true,
   showArrows: true,
-  showMultiPvArrows: true,
   autoplayMs: 900,
 };
 

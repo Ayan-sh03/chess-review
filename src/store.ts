@@ -272,7 +272,11 @@ export const useStore = create<AppState>((set, get) => ({
     const handle = orch.analyze(
       fen,
       { depth: Math.max(settings.engine.deepDepth, 16), multiPv: settings.engine.multiPv, threads: settings.engine.threads, hashMb: settings.engine.hashMb },
-      (a) => set({ liveAnalysis: a })
+      (a) => {
+        // Interim engine updates can arrive after the user has moved on;
+        // only show them if they match the position on the board.
+        if (a.fen === currentFenOf(get())) set({ liveAnalysis: a });
+      }
     );
     liveHandle = handle;
     handle.promise.then((a) => {
