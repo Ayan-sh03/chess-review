@@ -29,13 +29,14 @@ export default function Board() {
   const playedClass: Classification | undefined =
     !variation && currentPly > 0 ? review?.moves[currentPly - 1]?.classification : undefined;
 
-  // Best move comes from the live engine (only if it analyzed this exact
-  // position — stale results must never draw on the board), else from the
-  // review of this position.
+  // Live engine results only count if they analyzed this exact position —
+  // stale results must never draw on the board.
   const live = liveAnalysis && liveAnalysis.fen === fen ? liveAnalysis : null;
-  const bestUci =
-    live?.bestUci ??
-    (!variation && game ? review?.moves[currentPly]?.bestUci : undefined);
+  // The blue arrow is the best alternative to the move just played (what the
+  // mover should have done), not the reply in the position now on the board.
+  const bestUci = playedMove
+    ? review?.moves[currentPly - 1]?.bestUci
+    : (!variation && game ? review?.moves[currentPly]?.bestUci : undefined) ?? live?.bestUci;
 
   const arrows = useMemo(() => {
     if (!settings.showArrows) return [] as any[];
