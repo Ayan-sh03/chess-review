@@ -99,6 +99,7 @@ interface AppState {
   toStart: () => void;
   toEnd: () => void;
   flip: () => void;
+  setMyColor: (color: 'white' | 'black') => void;
   setAutoplay: (on: boolean) => void;
 
   analyzeCurrent: () => void;
@@ -257,6 +258,10 @@ export const useStore = create<AppState>((set, get) => ({
     if (g) get().goTo(g.plies.length);
   },
   flip: () => set({ orientation: get().orientation === 'white' ? 'black' : 'white' }),
+  setMyColor: (color) => {
+    get().updateSettings({ myColor: color });
+    set({ orientation: color });
+  },
   setAutoplay: (on) => set({ autoplay: on }),
 
   analyzeCurrent: () => {
@@ -377,9 +382,7 @@ function autoOrient() {
   if (!s.settings.autoFlip) return;
   const game = s.games[s.selectedGameIndex];
   if (!game) return;
-  // Orient to the user if we can guess; default white. Heuristic: if Black is
-  // the named player matching common case we still default white. Keep white.
-  useStore.setState({ orientation: 'white' });
+  useStore.setState({ orientation: s.settings.myColor });
 }
 
 function emptyStats() {

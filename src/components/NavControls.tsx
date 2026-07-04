@@ -22,7 +22,7 @@ function Btn({
 
 export default function NavControls() {
   const {
-    toStart, prev, next, toEnd, flip, autoplay, setAutoplay,
+    toStart, prev, next, toEnd, flip, autoplay, setAutoplay, setMyColor,
     currentPly, games, selectedGameIndex, settings, updateSettings,
   } = useStore();
   const game = games[selectedGameIndex];
@@ -41,6 +41,19 @@ export default function NavControls() {
         {autoplay ? '⏸' : '⏯'}
       </Btn>
       <Btn onClick={flip} label="Flip board">⟲</Btn>
+      <span className="ml-1 flex items-center gap-1 text-xs text-neutral-400">
+        I play
+        <Btn
+          onClick={() => setMyColor('white')}
+          label="I play White"
+          active={settings.myColor === 'white'}
+        >♔</Btn>
+        <Btn
+          onClick={() => setMyColor('black')}
+          label="I play Black"
+          active={settings.myColor === 'black'}
+        >♚</Btn>
+      </span>
       <label className="ml-1 flex items-center gap-1 text-xs text-neutral-400">
         Speed
         <input

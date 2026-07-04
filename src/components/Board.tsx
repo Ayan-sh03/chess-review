@@ -38,17 +38,24 @@ export default function Board() {
     ? review?.moves[currentPly - 1]?.bestUci
     : (!variation && game ? review?.moves[currentPly]?.bestUci : undefined) ?? live?.bestUci;
 
+  // Suggestions are for the user's side only: the blue arrow is suppressed
+  // when the relevant mover (the played move's author, or the side to move)
+  // is the opponent.
+  const myColorChar = settings.myColor === 'white' ? 'w' : 'b';
+  const moverChar = playedMove ? playedMove.color : fen.split(' ')[1];
+  const bestIsMine = moverChar === myColorChar;
+
   const arrows = useMemo(() => {
     if (!settings.showArrows) return [] as any[];
     const out: [string, string, string?][] = [];
     if (playedMove) {
       out.push([playedMove.uci.slice(0, 2), playedMove.uci.slice(2, 4), '#f5a623']);
     }
-    if (bestUci && bestUci.slice(0, 4) !== playedMove?.uci.slice(0, 4)) {
+    if (bestIsMine && bestUci && bestUci.slice(0, 4) !== playedMove?.uci.slice(0, 4)) {
       out.push([bestUci.slice(0, 2), bestUci.slice(2, 4), '#22a7f0']);
     }
     return out;
-  }, [bestUci, playedMove, settings.showArrows]);
+  }, [bestUci, bestIsMine, playedMove, settings.showArrows]);
 
   const squareStyles = useMemo(() => {
     const st: Record<string, React.CSSProperties> = {};

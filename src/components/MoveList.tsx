@@ -8,9 +8,19 @@ export default function MoveList() {
   const { games, selectedGameIndex, review, currentPly, goTo } = useStore();
   const game = games[selectedGameIndex];
   const activeRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
+  // Follow the active move by scrolling only the list's own scrollbox —
+  // scrollIntoView would also scroll page-level ancestors, yanking the
+  // viewport away from the board on every forward/backward step.
   useEffect(() => {
-    activeRef.current?.scrollIntoView({ block: 'nearest' });
+    const el = activeRef.current;
+    const box = listRef.current;
+    if (!el || !box) return;
+    const er = el.getBoundingClientRect();
+    const br = box.getBoundingClientRect();
+    if (er.top < br.top) box.scrollTop += er.top - br.top;
+    else if (er.bottom > br.bottom) box.scrollTop += er.bottom - br.bottom;
   }, [currentPly]);
 
   if (!game || game.plies.length === 0)
@@ -34,7 +44,10 @@ export default function MoveList() {
     return (
       <button
         ref={isActive ? activeRef : undefined}
-        onClick={() => goTo(idx + 1)}
+        onClick={(e) => {
+          goTo(idx + 1);
+          e.currentTarget.blur();
+        }}
         className={`group flex w-full items-center gap-1 rounded px-1.5 py-0.5 text-left text-sm
           ${isActive ? 'bg-emerald-700/40 ring-1 ring-emerald-600' : 'hover:bg-neutral-800'}`}
         title={r ? `${CLASSIFICATION_META[r.classification].label}${r.scoreAfter ? ' · ' + formatScore(r.scoreAfter) : ''}` : undefined}
@@ -51,7 +64,7 @@ export default function MoveList() {
   };
 
   return (
-    <div className="scroll-thin max-h-[60vh] overflow-y-auto p-1">
+    <div ref={listRef} className="scroll-thin max-h-[60vh] overflow-y-auto p-1">
       {review?.openingName && (
         <div className="mb-1 px-2 py-1 text-xs text-amber-300/80">
           📖 {review.openingName} {review.eco ? `(${review.eco})` : ''}

@@ -146,6 +146,7 @@ export interface Settings {
   autoFlip: boolean;
   showArrows: boolean;
   autoplayMs: number;
+  myColor: 'white' | 'black';
 }
 
 export const DEFAULT_THRESHOLDS: Thresholds = {
@@ -167,6 +168,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoFlip: true,
   showArrows: true,
   autoplayMs: 900,
+  myColor: 'white',
 };
 
 // --------------------------- classification meta --------------------------
