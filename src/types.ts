@@ -114,6 +114,51 @@ export interface ReviewedGame {
   finalDepth: number;
 }
 
+// --------------------------- coach layer ----------------------------------
+
+/** Coach classification: coarse, win-prob-delta based (see logic/coach.ts). */
+export type CoachClassification = 'okay' | 'inaccuracy' | 'mistake' | 'blunder';
+
+export type CoachTag =
+  | 'missed-check'
+  | 'missed-capture'
+  | 'missed-mate'
+  | 'early-queen';
+
+/** One human-readable coaching moment, fully deterministic (no LLM). */
+export interface CoachMoment {
+  moveNumber: number;
+  ply: number;
+  fen: string; // position BEFORE the move (jump target)
+  fenAfter: string; // position AFTER the move
+  sideToMove: Color; // the side that made the move
+  playedMove: string; // SAN
+  playedUci: string;
+  bestMove: string; // SAN
+  bestUci: string;
+  pvUci: string[]; // engine best line from `fen` (>= 1 move)
+  pvSan: string[];
+  evalBefore: number; // centipawns, White POV (mate clamped)
+  evalAfter: number; // centipawns, White POV
+  winProbBefore: number; // 0..1, mover POV
+  winProbAfter: number; // 0..1, mover POV
+  winProbDrop: number; // winProbBefore - winProbAfter, >= 0
+  classification: CoachClassification;
+  tags: CoachTag[];
+  title: string;
+  message: string;
+  advice: string;
+}
+
+export interface CoachReport {
+  gameId: string;
+  coachSchemaVersion: number;
+  moments: CoachMoment[]; // only critical ones, sorted by winProbDrop desc
+  summary: string; // templated top-line
+  biggestMistake?: CoachMoment;
+  recurringTags: CoachTag[]; // tags appearing >= 2x across moments
+}
+
 // --------------------------- settings -------------------------------------
 
 /** Thresholds operate on win% loss (mover POV). All tunable in Settings. */

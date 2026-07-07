@@ -5,6 +5,7 @@ import NavControls from './components/NavControls';
 import EvalGraph from './components/EvalGraph';
 import MoveList from './components/MoveList';
 import ReviewPanel from './components/ReviewPanel';
+import CoachPanel from './components/CoachPanel';
 import EnginePanel from './components/EnginePanel';
 import InputPanel from './components/InputPanel';
 import SettingsPanel from './components/SettingsPanel';
@@ -13,10 +14,11 @@ import VariationBar from './components/VariationBar';
 import { useKeyboardNav, useAutoplay } from './ui/hooks';
 import { useStore } from './store';
 
-type Tab = 'review' | 'moves' | 'engine' | 'input' | 'settings' | 'saved';
+type Tab = 'review' | 'coach' | 'moves' | 'engine' | 'input' | 'settings' | 'saved';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'review', label: 'Review' },
+  { id: 'coach', label: 'Coach' },
   { id: 'moves', label: 'Moves' },
   { id: 'engine', label: 'Engine' },
   { id: 'input', label: 'Input' },
@@ -75,6 +77,7 @@ export default function App() {
 
           <div className="scroll-thin max-h-[78vh] overflow-y-auto pr-1">
             {tab === 'review' && <ReviewPanel />}
+            {tab === 'coach' && <CoachPanel />}
             {tab === 'moves' && (
               <div className="rounded-lg border border-neutral-800 bg-neutral-900/60">
                 <MoveList />

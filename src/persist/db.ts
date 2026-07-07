@@ -1,10 +1,11 @@
-import type { PositionAnalysis, ReviewedGame, Settings } from '../types';
+import type { CoachReport, PositionAnalysis, ReviewedGame, Settings } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
 
 const DB_NAME = 'chess-review';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const CACHE_STORE = 'analysisCache';
 const GAMES_STORE = 'games';
+const COACH_STORE = 'coach';
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -18,6 +19,8 @@ function openDb(): Promise<IDBDatabase> {
         db.createObjectStore(CACHE_STORE);
       if (!db.objectStoreNames.contains(GAMES_STORE))
         db.createObjectStore(GAMES_STORE, { keyPath: 'id' });
+      if (!db.objectStoreNames.contains(COACH_STORE))
+        db.createObjectStore(COACH_STORE, { keyPath: 'gameId' });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -83,6 +86,36 @@ export async function listGames(): Promise<ReviewedGame[]> {
 
 export async function deleteGame(id: string): Promise<void> {
   await tx(GAMES_STORE, 'readwrite', (s) => s.delete(id));
+}
+
+// --------------------------- coach reports --------------------------------
+// Derived data (regenerable from the stored review), so failures are
+// best-effort like the analysis cache.
+
+export async function saveCoachReport(report: CoachReport): Promise<void> {
+  try {
+    await tx(COACH_STORE, 'readwrite', (s) => s.put(report));
+  } catch {
+    /* derived data — safe to drop */
+  }
+}
+
+export async function getCoachReport(
+  gameId: string
+): Promise<CoachReport | undefined> {
+  try {
+    return await tx<CoachReport>(COACH_STORE, 'readonly', (s) => s.get(gameId));
+  } catch {
+    return undefined;
+  }
+}
+
+export async function deleteCoachReport(gameId: string): Promise<void> {
+  try {
+    await tx(COACH_STORE, 'readwrite', (s) => s.delete(gameId));
+  } catch {
+    /* best-effort */
+  }
 }
 
 // --------------------------- settings (localStorage) -----------------------

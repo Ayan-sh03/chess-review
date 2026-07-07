@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Chess } from 'chess.js';
 import type {
+  CoachReport,
   MoveReview,
   PositionAnalysis,
   ReviewedGame,
@@ -14,6 +15,7 @@ import {
   type ParsedGame,
 } from './logic/pgn';
 import { reviewGame, buildReviews } from './logic/reviewer';
+import { buildCoachReport, COACH_SCHEMA_VERSION } from './logic/coach';
 import { uciToMoveObj } from './logic/material';
 import {
   loadSettings,
@@ -21,6 +23,9 @@ import {
   saveGame,
   listGames,
   deleteGame,
+  saveCoachReport,
+  getCoachReport,
+  deleteCoachReport,
 } from './persist/db';
 import {
   fetchLichessGame,
@@ -66,6 +71,7 @@ interface AppState {
   progress: { done: number; total: number; pass: 'shallow' | 'deep' } | null;
   review: ReviewedGame | null;
   analyses: (PositionAnalysis | null)[];
+  coachReport: CoachReport | null;
   errorMsg: string | null;
 
   // navigation
@@ -155,13 +161,16 @@ export const useStore = create<AppState>((set, get) => ({
       review.moves.filter((m) => m.isBook).length,
       review.openingName ? `${review.openingName} (${review.eco})` : undefined
     );
-    set({ review: { ...review, moves } });
+    set({
+      review: { ...review, moves },
+      coachReport: buildCoachReport(review.id, moves, analyses),
+    });
   },
 
   games: [],
   selectedGameIndex: 0,
   selectGame: (i) => {
-    set({ selectedGameIndex: i, status: 'idle', review: null, currentPly: 0, analyses: [], variation: null });
+    set({ selectedGameIndex: i, status: 'idle', review: null, currentPly: 0, analyses: [], variation: null, coachReport: null });
     get().analyzeCurrent();
     autoOrient();
   },
@@ -172,6 +181,7 @@ export const useStore = create<AppState>((set, get) => ({
   progress: null,
   review: null,
   analyses: [],
+  coachReport: null,
   errorMsg: null,
 
   currentPly: 0,
@@ -186,7 +196,7 @@ export const useStore = create<AppState>((set, get) => ({
   loadPgn: (pgn) => {
     try {
       const games = parseMultiGame(pgn);
-      set({ games, selectedGameIndex: 0, inputError: null, status: 'idle', review: null, currentPly: 0, analyses: [], variation: null });
+      set({ games, selectedGameIndex: 0, inputError: null, status: 'idle', review: null, currentPly: 0, analyses: [], variation: null, coachReport: null });
       autoOrient();
       get().analyzeCurrent();
     } catch (e: any) {
@@ -196,7 +206,7 @@ export const useStore = create<AppState>((set, get) => ({
   loadFen: (fen) => {
     try {
       const g = gameFromFen(fen);
-      set({ games: [g], selectedGameIndex: 0, inputError: null, status: 'idle', review: null, currentPly: 0, analyses: [], variation: null });
+      set({ games: [g], selectedGameIndex: 0, inputError: null, status: 'idle', review: null, currentPly: 0, analyses: [], variation: null, coachReport: null });
       get().analyzeCurrent();
     } catch (e: any) {
       set({ inputError: e?.message ?? String(e) });
@@ -215,7 +225,7 @@ export const useStore = create<AppState>((set, get) => ({
       return;
     }
     reviewSignal = { cancelled: false };
-    set({ status: 'reviewing', errorMsg: null, progress: { done: 0, total: game.plies.length + 1, pass: 'shallow' } });
+    set({ status: 'reviewing', errorMsg: null, coachReport: null, progress: { done: 0, total: game.plies.length + 1, pass: 'shallow' } });
     try {
       const orch = getOrchestrator();
       const reviewed = await reviewGame(game, get().settings, orch, {
@@ -232,7 +242,11 @@ export const useStore = create<AppState>((set, get) => ({
         },
         signal: reviewSignal,
       });
-      set({ status: 'done', review: reviewed });
+      set({
+        status: 'done',
+        review: reviewed,
+        coachReport: buildCoachReport(reviewed.id, reviewed.moves, get().analyses),
+      });
     } catch (e: any) {
       if (e?.message === 'cancelled') set({ status: 'idle' });
       else set({ status: 'error', errorMsg: e?.message ?? String(e) });
@@ -341,11 +355,16 @@ export const useStore = create<AppState>((set, get) => ({
     if (!review) return;
     const toSave = review.id === 'live' ? { ...review, id: crypto.randomUUID() } : review;
     await saveGame(toSave);
-    set({ review: toSave });
+    // Persist the coach report under the (possibly new) game id.
+    const coach = get().coachReport ?? buildCoachReport(toSave.id, toSave.moves, get().analyses);
+    const coachToSave = { ...coach, gameId: toSave.id };
+    await saveCoachReport(coachToSave);
+    set({ review: toSave, coachReport: coachToSave });
     await get().refreshSaved();
   },
   removeSaved: async (id) => {
     await deleteGame(id);
+    await deleteCoachReport(id);
     await get().refreshSaved();
   },
   openSaved: (game) => {
@@ -357,10 +376,20 @@ export const useStore = create<AppState>((set, get) => ({
     const parsed: ParsedGame = { tags: game.tags, pgn: game.pgn, startFen: game.startFen, plies };
     set({
       games: [parsed], selectedGameIndex: 0, review: game, status: 'done',
-      currentPly: 0, analyses: [], variation: null, errorMsg: null,
+      currentPly: 0, analyses: [], variation: null, errorMsg: null, coachReport: null,
     });
     autoOrient();
     get().analyzeCurrent();
+    // Coach data is derived: load the persisted report if its schema is
+    // current, otherwise regenerate from the stored review.
+    void getCoachReport(game.id).then((stored) => {
+      if (useStore.getState().review?.id !== game.id) return; // user moved on
+      const coach =
+        stored && stored.coachSchemaVersion === COACH_SCHEMA_VERSION
+          ? stored
+          : buildCoachReport(game.id, game.moves);
+      set({ coachReport: coach });
+    });
   },
 }));
 
