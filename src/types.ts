@@ -181,6 +181,8 @@ export interface EngineSettings {
   multiPv: number;
   threads: number; // used only when multi-threaded build is active
   hashMb: number;
+  reviewWorkers: number; // parallel engines for game review; 0 = auto (by core count)
+  deepMovetimeMs: number; // per-position cap for the deep pass; 0 = uncapped
 }
 
 export interface Settings {
@@ -206,7 +208,7 @@ export const DEFAULT_THRESHOLDS: Thresholds = {
 };
 
 export const DEFAULT_SETTINGS: Settings = {
-  engine: { shallowDepth: 12, deepDepth: 18, multiPv: 3, threads: 4, hashMb: 64 },
+  engine: { shallowDepth: 12, deepDepth: 18, multiPv: 3, threads: 4, hashMb: 64, reviewWorkers: 0, deepMovetimeMs: 1000 },
   thresholds: DEFAULT_THRESHOLDS,
   boardLight: '#ebecd0',
   boardDark: '#739552',

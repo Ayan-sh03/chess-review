@@ -14,7 +14,7 @@ import { classify } from './classify';
 import { netSacrifice } from './material';
 import { scoreToCp, scoreToEvalPawns } from './winprob';
 import { computeStats } from './accuracy';
-import type { Orchestrator } from '../engine/orchestrator';
+import type { EnginePool } from '../engine/pool';
 import { getCachedAnalysis, putCachedAnalysis } from '../persist/db';
 
 export interface ReviewProgress {
@@ -137,16 +137,18 @@ function pendingReview(ply: any, color: Color): MoveReview {
 
 /**
  * Two-pass game review: a fast shallow sweep for immediate feedback, then a
- * deep refining pass. Emits partial results after every position so the UI
- * updates live. Honours `signal.cancelled` for abort.
+ * deep refining pass. Positions are independent, so each pass fans out across
+ * every engine in the pool. Emits partial results as positions complete (UI
+ * rebuilds are throttled — buildReviews is O(plies) of chess.js work).
+ * Honours `signal.cancelled` for abort.
  */
 export async function reviewGame(
   game: ParsedGame,
   settings: Settings,
-  orch: Orchestrator,
+  pool: EnginePool,
   cb: ReviewCallbacks = {}
 ): Promise<ReviewedGame> {
-  await orch.whenReady();
+  await pool.whenReady();
 
   // Unique positions: start, then each fenAfter.
   const fens: string[] = [game.startFen, ...game.plies.map((p) => p.fenAfter)];
@@ -156,25 +158,39 @@ export async function reviewGame(
   const bookPlies = opening?.bookPlies ?? 0;
   const openingComment = opening ? `${opening.name} (${opening.eco})` : undefined;
 
-  const passes: { depth: number; pass: 'shallow' | 'deep' }[] = [
+  const passes: { depth: number; pass: 'shallow' | 'deep'; movetimeMs?: number }[] = [
     { depth: settings.engine.shallowDepth, pass: 'shallow' },
-    { depth: settings.engine.deepDepth, pass: 'deep' },
+    {
+      depth: settings.engine.deepDepth,
+      pass: 'deep',
+      movetimeMs: settings.engine.deepMovetimeMs || undefined,
+    },
   ];
 
-  for (const { depth, pass } of passes) {
-    for (let i = 0; i < fens.length; i++) {
-      if (cb.signal?.cancelled) throw new Error('cancelled');
+  let lastPartial = 0;
+  const emitPartial = (force = false) => {
+    const now = Date.now();
+    if (!force && now - lastPartial < 250) return;
+    lastPartial = now;
+    const partial = buildReviews(game, analyses, settings, bookPlies, openingComment);
+    cb.onPartial?.(partial, analyses);
+  };
+
+  for (const { depth, pass, movetimeMs } of passes) {
+    let nextIdx = 0;
+    let done = 0;
+
+    const runOne = async (i: number) => {
       const fen = fens[i];
 
       // Reuse a cached result computed at exactly this depth if present.
       let analysis = await getCachedAnalysis(fen, depth);
 
       if (!analysis) {
-        analysis = await orch.analyze(fen, {
+        analysis = await pool.analyze(fen, {
           depth,
           multiPv: settings.engine.multiPv,
-          threads: settings.engine.threads,
-          hashMb: settings.engine.hashMb,
+          movetimeMs,
         }).promise;
         if (analysis.lines.length > 0) void putCachedAnalysis(analysis);
       }
@@ -184,10 +200,25 @@ export async function reviewGame(
         analyses[i] = analysis;
       }
 
-      cb.onProgress?.({ done: i + 1, total: fens.length, pass });
-      const partial = buildReviews(game, analyses, settings, bookPlies, openingComment);
-      cb.onPartial?.(partial, analyses);
+      done++;
+      cb.onProgress?.({ done, total: fens.length, pass });
+      emitPartial();
+    };
+
+    // One consumer per engine; each pulls the next un-analysed position.
+    const consumer = async () => {
+      while (nextIdx < fens.length) {
+        if (cb.signal?.cancelled) throw new Error('cancelled');
+        await runOne(nextIdx++);
+      }
+    };
+    try {
+      await Promise.all(Array.from({ length: pool.size }, consumer));
+    } catch (e) {
+      pool.cancelAll();
+      throw e;
     }
+    emitPartial(true);
   }
 
   const moves = buildReviews(game, analyses, settings, bookPlies, openingComment);

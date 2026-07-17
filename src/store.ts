@@ -8,6 +8,7 @@ import type {
   Settings,
 } from './types';
 import { Orchestrator } from './engine/orchestrator';
+import { EnginePool, defaultPoolSize } from './engine/pool';
 import { canUseThreads, pickFlavor, type EngineFlavor } from './engine/stockfish';
 import {
   parseMultiGame,
@@ -39,6 +40,23 @@ let orchestrator: Orchestrator | null = null;
 function getOrchestrator(): Orchestrator {
   if (!orchestrator) orchestrator = new Orchestrator();
   return orchestrator;
+}
+
+// Separate pool for game review: many engines, one position each. Kept warm
+// between reviews; rebuilt if the worker-count setting changes.
+let reviewPool: EnginePool | null = null;
+let reviewPoolSize = 0;
+function getReviewPool(workers: number): EnginePool {
+  const size = workers > 0 ? workers : defaultPoolSize();
+  if (reviewPool && reviewPoolSize !== size) {
+    reviewPool.terminate();
+    reviewPool = null;
+  }
+  if (!reviewPool) {
+    reviewPool = new EnginePool(size);
+    reviewPoolSize = size;
+  }
+  return reviewPool;
 }
 
 export type ReviewStatus = 'idle' | 'parsing' | 'reviewing' | 'done' | 'error';
@@ -227,8 +245,8 @@ export const useStore = create<AppState>((set, get) => ({
     reviewSignal = { cancelled: false };
     set({ status: 'reviewing', errorMsg: null, coachReport: null, progress: { done: 0, total: game.plies.length + 1, pass: 'shallow' } });
     try {
-      const orch = getOrchestrator();
-      const reviewed = await reviewGame(game, get().settings, orch, {
+      const pool = getReviewPool(get().settings.engine.reviewWorkers);
+      const reviewed = await reviewGame(game, get().settings, pool, {
         onProgress: (p) => set({ progress: p }),
         onPartial: (moves, analyses) => {
           const prev = get().review;
@@ -254,7 +272,7 @@ export const useStore = create<AppState>((set, get) => ({
   },
   cancelReview: () => {
     reviewSignal.cancelled = true;
-    getOrchestrator().cancelAll();
+    reviewPool?.cancelAll();
   },
 
   goTo: (ply) => {

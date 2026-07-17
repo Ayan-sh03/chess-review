@@ -49,6 +49,10 @@ export default function SettingsPanel() {
             onChange={(v) => updateSettings({ engine: { ...e, threads: v } })} />
           <Num label="Hash (MB)" value={e.hashMb} min={16} max={512} step={16}
             onChange={(v) => updateSettings({ engine: { ...e, hashMb: v } })} />
+          <Num label="Review engines (0 = auto)" value={e.reviewWorkers} min={0} max={8}
+            onChange={(v) => updateSettings({ engine: { ...e, reviewWorkers: v } })} />
+          <Num label="Deep pass ms/position (0 = uncapped)" value={e.deepMovetimeMs} min={0} max={10000} step={100}
+            onChange={(v) => updateSettings({ engine: { ...e, deepMovetimeMs: v } })} />
         </div>
       </Section>
 

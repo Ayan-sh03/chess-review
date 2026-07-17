@@ -27,8 +27,11 @@ npm run test       # vitest run (unit tests live next to src/logic modules)
   All actions live here; components stay thin.
 - `src/logic/` — pure, unit-tested modules (pgn, classify, winprob, accuracy,
   openings, reviewer). New pure logic goes here with a `.test.ts` beside it.
-- `src/engine/` — Stockfish worker plumbing (uci, orchestrator). Engine flavor
-  (threaded vs single) is picked at startup from browser capabilities.
+- `src/engine/` — Stockfish worker plumbing (uci, orchestrator, pool). Engine
+  flavor (threaded vs single) is picked at startup from browser capabilities.
+  Live analysis uses one Orchestrator; game review fans positions out across an
+  `EnginePool` of parallel workers (auto-sized to CPU cores, 2 threads each),
+  with a per-position `deepMovetimeMs` cap bounding the deep pass.
 - `src/components/` — Board, MoveList, NavControls, EvalBar/EvalGraph, panels.
 - `src/persist/db.ts` — saved games in IndexedDB; settings in localStorage under
   `chess-review-settings`.

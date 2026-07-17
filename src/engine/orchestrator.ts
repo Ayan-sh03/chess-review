@@ -7,6 +7,8 @@ export interface AnalyzeOptions {
   multiPv: number;
   threads?: number;
   hashMb?: number;
+  /** Per-position wall-clock cap; search stops at depth or timeout, whichever first. */
+  movetimeMs?: number;
 }
 
 export interface AnalyzeHandle {
@@ -123,7 +125,8 @@ export class Orchestrator {
       hashMb: job.opts.hashMb,
     });
     this.sf.send(`position fen ${job.fen}`);
-    this.sf.send(`go depth ${job.opts.depth}`);
+    const mt = job.opts.movetimeMs;
+    this.sf.send(mt ? `go depth ${job.opts.depth} movetime ${mt}` : `go depth ${job.opts.depth}`);
   }
 
   analyze(
